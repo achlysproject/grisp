@@ -7,13 +7,15 @@
 %%% Created : 25. Jul 2019 21:21
 %%%-------------------------------------------------------------------
 -module(pmod_8ld).
--author("Igor Kopestenski").
 
 -behaviour(gen_server).
 
 %% API
 -export([start_link/0]).
 -export([on/0]).
+-export([configure/1]).
+-export([start/1]).
+-export([stop/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -25,7 +27,7 @@
 
 -define(SERVER, ?MODULE).
 
--define(INTERVAL, 3000).
+% -define(INTERVAL, 3000).
 
 %%====================================================================
 %% Records
@@ -61,7 +63,18 @@ start_link() ->
 -spec(on() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 on() ->
-    gen_server:call({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:call({local, ?SERVER}, on).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% GPIO configuration
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec(configure({Slot :: term(), {T1 :: term(), T2 :: term(), T3 :: term(), T4 :: term()}}) ->
+    {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+configure({Slot, {T1, T2, T3, T4}}) ->
+    gen_server:call({local, ?SERVER}, {Slot, {T1, T2, T3, T4}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,17 +91,22 @@ on() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
--spec(init(Args :: term()) ->
-    {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term()} | ignore).
+% -spec(init(Args :: term()) ->
+%     {ok, State :: state()} | {ok, State :: state(), timeout() | hibernate} |
+%     {stop, Reason :: term()} | ignore).
+% init([]) ->
+%     % State = #state{
+%     %     interval = 3000
+%     % },
+%     %% Schedule first message
+%     % schedule_periodical(State#state.interval, periodical),
+%     {ok, State}}.
+-spec init([]) -> {ok , state()}.
 init([]) ->
-    State = #state{
-        interval = ?INTERVAL
-    },
-    grisp_gpio:configure_slot(Slot, {output_0, output_0, output_0, output_0}),
-    %% Schedule first message
-    % schedule_periodical(State#state.interval, periodical),
-    {ok, State}}.
+    {ok, #state{
+            interval = 3000
+        }
+    }.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -98,13 +116,16 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #state{}) ->
-    {reply, Reply :: term(), NewState :: #state{}} |
-    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+    State :: state()) ->
+    {reply, Reply :: term(), NewState :: state()} |
+    {reply, Reply :: term(), NewState :: state(), timeout() | hibernate} |
+    {noreply, NewState :: state()} |
+    {noreply, NewState :: state(), timeout() | hibernate} |
+    {stop, Reason :: term(), Reply :: term(), NewState :: state()} |
+    {stop, Reason :: term(), NewState :: state()}).
+handle_call({Slot, {T1, T2, T3, T4}}, _From, State) ->
+    grisp_gpio:configure_slot(Slot, {T1, T2, T3, T4}),
+    {reply, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -115,10 +136,10 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_cast(Request :: term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_cast(Request :: term(), State :: state()) ->
+    {noreply, NewState :: state()} |
+    {noreply, NewState :: state(), timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: state()}).
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -132,10 +153,10 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_info(Info :: timeout() | term(), State :: state()) ->
+    {noreply, NewState :: state()} |
+    {noreply, NewState :: state(), timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: state()}).
 handle_info(periodical, State) ->
     %% handle loop message and reschedule listener
 
@@ -159,7 +180,7 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
+    State :: state()) -> term()).
 terminate(_Reason, _State) ->
     ok.
 
@@ -171,9 +192,9 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
+-spec(code_change(OldVsn :: term() | {down, term()}, State :: state(),
     Extra :: term()) ->
-    {ok, NewState :: #state{}} | {error, Reason :: term()}).
+    {ok, NewState :: state()} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -183,3 +204,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 schedule_periodical(Interval) ->
     erlang:send_after(Interval, ?SERVER, periodical).
+
+start(gpio1) -> grisp_gpio:set(gpio1_2);
+start(gpio2) -> grisp_gpio:set(gpio2_2).
+
+stop(gpio1) -> grisp_gpio:clear(gpio1_2);
+stop(gpio2) -> grisp_gpio:clear(gpio2_2).
