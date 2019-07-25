@@ -25,6 +25,8 @@
 
 -define(SERVER, ?MODULE).
 
+-define(INTERVAL, 3000).
+
 %%====================================================================
 %% Records
 %%====================================================================
@@ -83,7 +85,7 @@ init([]) ->
     State = #state{
         interval = ?INTERVAL
     },
-    grisp_gpio:configure_slot(Slot, {output_0, output_0, output_0, output_0}).
+    grisp_gpio:configure_slot(Slot, {output_0, output_0, output_0, output_0}),
     %% Schedule first message
     % schedule_periodical(State#state.interval, periodical),
     {ok, State}}.
